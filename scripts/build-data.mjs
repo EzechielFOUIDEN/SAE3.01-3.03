@@ -7,11 +7,13 @@
  *     Données des candidatures-20261118/fr-esr-mon_master_2024-2025.csv
  *     fr-esr-insertion_professionnelle-master_2010-2020.csv
  *
- * Sorties (dossier data/) :
- *   formations.json  formations du périmètre « création numérique » + candidatures 2023-2025 + coordonnées (API REST)
- *   insertion.json   insertion professionnelle (2010-2020) des disciplines liées au périmètre
- *   repères.json     distribution nationale (quantiles) pour situer une formation
- *   meta.json        sources, périmètre, date de génération, comptages de contrôle
+ * Sorties :
+ *   js/data.js            window.MASTERLAB = { meta, masters, insertion, reperes }
+ *     masters    formations du périmètre « création numérique » + candidatures 2023-2025 + coordonnées (API REST)
+ *     insertion  insertion professionnelle (2010-2020) des disciplines liées au périmètre
+ *     reperes    distribution nationale (quantiles) pour situer une formation
+ *     meta       sources, périmètre, date de génération, comptages de contrôle
+ *   js/france-regions.js  window.FRANCE_GEO (fond de carte)
  *
  * Aucune donnée n'est inventée : valeur absente ou non numérique => null.
  */
@@ -60,6 +62,15 @@ const num = (v) => {
   const s = String(v).trim().replace(',', '.');
   return s !== '' && /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : null;
 };
+/** Lit une colonne dont l'intitulé peut contenir des espaces multiples (comparaison sans espaces en trop). */
+const flat = (s) => s.replace(/\s+/g, ' ').trim();
+let flatKeys; // table intitulé normalisé -> intitulé réel (seul le fichier 2024-2025 utilise numK)
+const numK = (row, label) => {
+  flatKeys ??= new Map(Object.keys(row).map((k) => [flat(k), k]));
+  const k = flatKeys.get(flat(label));
+  if (k === undefined) throw new Error(`Colonne introuvable : ${label}`);
+  return num(row[k]);
+};
 const pct = (a, b) => (a != null && b ? Math.round((a / b) * 1000) / 10 : null);
 
 // ---------- Candidatures ----------
@@ -97,6 +108,15 @@ function from2425(r) {
     acceptesPP: num(r[K.accPP]), acceptes: num(r[K.acc]),
     candidatsBUT: num(r[K.canBUT]), propositionsBUT: num(r[K.propBUT]), acceptesBUT: num(r[K.accBUT]),
     origines: { lg3: num(r[K.canLG]), lp3: num(r[K.canLP]), master: num(r[K.canMA]), autre: num(r[K.canAU]), nonInscrit: num(r[K.canNI]) },
+    // Admis (PP ou PC) selon la formation d'origine. Les intitulés de colonnes ont des espaces doubles : on compare sans les espaces en trop.
+    admisOrigines: {
+      lg3: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC inscrits en troisième année de licence générale à la rentrée N-1"),
+      lp3: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC inscrits en licence professionnelle à la rentrée N-1"),
+      but: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC inscrits en troisième année de bachelor universitaire de technologie à la rentrée N-1"),
+      master: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC inscrits en master à la rentrée N-1"),
+      autre: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC inscrits dans une autre formation à la rentrée N-1"),
+      nonInscrit: numK(r, "Effectif de candidats ayant accepté une proposition d'admission pour une candidature de PP ou de PC qui n'étaient pas inscrits dans un établissement d'enseignement supérieur en France à la rentrée N-1"),
+    },
     femmesPP: num(r[K.femPP]), rangDernierPP: num(r[K.rang]),
   };
 }
@@ -110,6 +130,7 @@ function from2023(r) {
     acceptesPP: num(r.n_accept), acceptes: num(r.n_accept),
     candidatsBUT: null, propositionsBUT: null, acceptesBUT: null,
     origines: { lg3: num(r.n_can_lg3), lp3: num(r.n_can_lp3), master: num(r.n_can_master), autre: num(r.n_can_autre), nonInscrit: num(r.n_can_noninscri) },
+    admisOrigines: { lg3: num(r.n_accept_lg3), lp3: num(r.n_accept_lp3), but: null, master: num(r.n_accept_master), autre: num(r.n_accept_autre), nonInscrit: num(r.n_accept_noninscri) },
     femmesPP: num(r.n_can_femme), rangDernierPP: num(r.rang_dernier),
   };
 }
@@ -145,20 +166,48 @@ for (const x of all) {
 
 // ---------- API : coordonnées + correspondance secteur -> discipline d'insertion ----------
 const getJson = async (p) => { const r = await fetch(API + p); if (!r.ok) throw new Error(`${p} : HTTP ${r.status}`); return r.json(); };
-const [apiFormations, apiSecteurs] = await Promise.all([getJson('/formations'), getJson('/secteurs-disciplinaires')]);
-const geo = new Map(apiFormations.map((a) => [a.ifc, a]));
-let sansPosition = 0;
-const posParUai = new Map();
-for (const f of formations.values()) {
-  const a = geo.get(f.ifc);
-  f.ville = a?.ville ?? null; f.dept = a?.dept ?? null; f.lat = a?.latitude ?? null; f.lon = a?.longitude ?? null;
-  if (f.lat != null) posParUai.set(f.uai, { ville: f.ville, dept: f.dept, lat: f.lat, lon: f.lon });
+const apiSecteurs = await getJson('/secteurs-disciplinaires');
+
+// Position : la ville et le département de l'API Masters-stats sont incohérents pour plusieurs formations
+// (ex. Lyon 3 -> « Ampus », Cnam Enjmin -> « Sai »). On part donc du premier lieu de formation déclaré
+// sur Mon Master (« ... - VILLE (dept) ») et on le géocode avec l'API Découpage administratif (geo.api.gouv.fr).
+const parseSeg = (seg) => {
+  const last = seg.trim().split(/\s[-–]\s/).pop();
+  const m = last.match(/^(.+?)(?:\s+C[EÉ]DEX(?:\s*\d+)?)?\s*(?:\((\d{2,3}[AB]?)\))?\s*$/i);
+  if (!m || (last === seg.trim() && !m[2])) return null;
+  const nom = m[1].replace(/\bSTE\b/gi, 'Sainte').replace(/\bST\b/gi, 'Saint').trim();
+  return nom.length > 1 ? { nom, dept: m[2] ?? null } : null;
+};
+// Premier lieu avec département ; à défaut, le premier lieu lisible (les virgules peuvent aussi couper un nom de site).
+const parseLieu = (lieux) => {
+  const segs = String(lieux ?? '').split(/[,|]/).map(parseSeg).filter(Boolean);
+  return segs.find((x) => x.dept) ?? segs[0] ?? null;
+};
+const geocache = new Map();
+async function geocode(l) {
+  const key = `${l.nom}|${l.dept}`;
+  if (geocache.has(key)) return geocache.get(key);
+  let res = null;
+  try {
+    const url = `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(l.nom)}&fields=nom,centre,codeDepartement&boost=population&limit=10`;
+    const r = await fetch(url);
+    const list = r.ok ? await r.json() : [];
+    let pick = l.dept ? list.find((c) => c.codeDepartement.startsWith(l.dept)) : list[0];
+    if (!pick && l.nom.includes('-')) { // ex. Cergy-Pontoise : commune « Cergy »
+      const l2 = await (await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(l.nom.split('-')[0])}&fields=nom,centre,codeDepartement&boost=population&limit=10`)).json();
+      pick = l2.find((c) => !l.dept || c.codeDepartement.startsWith(l.dept));
+    }
+    if (pick?.centre) res = { ville: pick.nom, dept: pick.codeDepartement, lat: pick.centre.coordinates[1], lon: pick.centre.coordinates[0] };
+  } catch { /* hors ligne : formation sans position */ }
+  geocache.set(key, res);
+  return res;
 }
+let sansPosition = 0;
 for (const f of formations.values()) {
-  if (f.lat == null && posParUai.has(f.uai)) { // repli : autre formation du même établissement (position approximative, signalée)
-    Object.assign(f, posParUai.get(f.uai), { positionApprox: true });
-  }
-  if (f.lat == null) sansPosition++;
+  const l = parseLieu(f.lieux);
+  const g = l ? await geocode(l) : null;
+  Object.assign(f, g ?? { ville: null, dept: null, lat: null, lon: null }, { positionApprox: false });
+  if (!g) sansPosition++;
 }
 const insDiscBySecteur = Object.fromEntries(apiSecteurs.map((s) => [s.id, s.insDiscId]));
 const secteursScope = [...new Set([...formations.values()].map((f) => f.secteurId))];
@@ -207,7 +256,10 @@ const meta = {
     etablissementsAvecInsertion: new Set(insRows.filter((r) => uaiScope.has(r.uai)).map((r) => r.uai)).size,
   },
 };
-mkdirSync(join(ROOT, 'data'), { recursive: true });
-const out = (n, o) => writeFileSync(join(ROOT, 'data', n), JSON.stringify(o));
-out('formations.json', list); out('insertion.json', insRows); out('reperes.json', reperes); out('meta.json', meta);
+// Scripts classiques (et non JSON chargé par fetch) : le site fonctionne aussi ouvert directement depuis le disque (file://).
+mkdirSync(join(ROOT, 'js'), { recursive: true });
+const banner = '/* Généré par scripts/build-data.mjs : ne pas modifier à la main. Sources : MESRI-SIES (Mon Master, insertion professionnelle), API Masters-stats. */\n';
+writeFileSync(join(ROOT, 'js', 'data.js'), `${banner}window.MASTERLAB = ${JSON.stringify({ meta, masters: list, insertion: insRows, reperes })};\n`);
+const fond = JSON.parse(readFileSync(join(ROOT, 'assets', 'geo', 'franceRegions.json'), 'utf8'));
+writeFileSync(join(ROOT, 'js', 'france-regions.js'), `/* Fond de carte : régions françaises (fichier de la démonstration du cours). */\nwindow.FRANCE_GEO = ${JSON.stringify(fond)};\n`);
 console.log(JSON.stringify(meta.controles, null, 1));

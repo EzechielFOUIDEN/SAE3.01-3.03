@@ -1,15 +1,17 @@
-/** Contrôle d'intégrité des données générées. Usage : node scripts/check-data.mjs (code de sortie 1 si une règle échoue). */
+/** Contrôle d'intégrité de js/data.js. Usage : node scripts/check-data.mjs (code de sortie 1 si une règle échoue). */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import assert from 'node:assert/strict';
 
-const D = join(dirname(fileURLToPath(import.meta.url)), '..', 'data');
-const read = (n) => JSON.parse(readFileSync(join(D, n), 'utf8'));
-const formations = read('formations.json'), insertion = read('insertion.json'), reperes = read('reperes.json');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ctx = { window: {} };
+runInNewContext(readFileSync(join(ROOT, 'js', 'data.js'), 'utf8'), ctx);
+const { masters, insertion, reperes } = ctx.window.MASTERLAB;
 
-assert.equal(new Set(formations.map((f) => f.ifc)).size, formations.length, 'ifc unique');
-for (const f of formations) {
+assert.equal(new Set(masters.map((f) => f.ifc)).size, masters.length, 'ifc unique');
+for (const f of masters) {
   assert.ok(Object.keys(f.sessions).length >= 1, `${f.ifc} : au moins une session`);
   for (const [y, s] of Object.entries(f.sessions)) {
     if (s.candidatsPP != null && s.propositionsPP != null) assert.ok(s.propositionsPP <= s.candidatsPP, `${f.ifc} ${y} : propositions <= candidats`);
@@ -20,4 +22,4 @@ for (const f of formations) {
 assert.ok(insertion.every((r) => r.mois === 18 || r.mois === 30), 'insertion : mois 18 ou 30');
 assert.ok(insertion.every((r) => r.salaireNet == null || r.salaireNet > 0), 'insertion : salaire absent ou positif');
 for (const y of [2023, 2024, 2025]) assert.ok(reperes[y].tauxProposition.p50 > 0, `repères ${y}`);
-console.log(`OK : ${formations.length} formations, ${insertion.length} lignes d'insertion`);
+console.log(`OK : ${masters.length} formations, ${insertion.length} lignes d'insertion`);
