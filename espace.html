@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mon espace · Master Lab</title>
+<link rel="icon" href="assets/favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  // Page réservée aux personnes connectées.
+  try { if (!JSON.parse(localStorage.getItem('ml_logged'))) location.replace('connexion.html?next=espace.html'); } catch { location.replace('connexion.html?next=espace.html'); }
+</script>
+</head>
+<body data-page="espace">
+<main>
+  <div class="band"><div class="wrap row between" style="padding-block:28px">
+    <div><p class="eyebrow">Mon espace</p><h1 id="hello"></h1></div>
+    <button class="btn" data-logout>Se déconnecter</button>
+  </div></div>
+  <nav class="tabs"><a href="#favoris">Favoris</a><a href="#compte">Mon compte</a></nav>
+
+  <div class="wrap split">
+    <section class="col grow" id="favoris">
+      <div class="row between"><h2 style="margin:0" id="fav-title"></h2><button class="btn p" id="cmp-sel">Comparer la sélection</button></div>
+      <div class="col" id="fav-list"></div>
+    </section>
+    <aside class="col" style="gap:24px;--aw:340px">
+      <div class="card col" id="compte">
+        <h3>Mon compte</h3>
+        <div id="infos"></div>
+        <p class="muted">Ces informations restent dans ce navigateur (prototype sans serveur).</p>
+      </div>
+    </aside>
+  </div>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  const me = user() || {};
+  $('#hello').textContent = `Bonjour ${me.prenom || ''}`;
+  $('#infos').innerHTML = [['Nom', `${me.prenom || ''} ${me.nom || ''}`], ['E-mail', me.email || ''], ['Formation d’origine', me.formation || '']]
+    .map(([l, v]) => `<div class="info"><span>${l}</span><b>${esc(v)}</b></div>`).join('');
+
+  function render() {
+    const list = favs().map(byId).filter(Boolean);
+    $('#fav-title').textContent = `${list.length} formation${list.length > 1 ? 's' : ''} en favori`;
+    $('#cmp-sel').disabled = list.length < 2;
+    $('#fav-list').innerHTML = list.map((m) => card(m)).join('')
+      || '<div class="card col" style="align-items:flex-start"><p>Aucun favori pour l’instant. Clique sur « ♡ Favori » dans la liste, la carte ou une fiche.</p><a class="btn p" href="formations.html">Parcourir les formations</a></div>';
+    syncButtons();
+  }
+  $('#cmp-sel').addEventListener('click', () => { store.set('cmp', favs().slice(0, 3)); location.href = 'comparateur.html'; });
+  document.addEventListener('ml:change', render);
+  render();
+</script>
+</body>
+</html>
