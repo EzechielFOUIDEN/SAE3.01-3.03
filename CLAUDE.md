@@ -3,7 +3,8 @@
 Site statique multi-pages (HTML + scripts classiques, ECharts, pas de build) qui reprend le prototype de l'équipe (`Wireframe/3-prototype`). Voir [ADMIN.md](ADMIN.md) pour l'architecture et [README.md](README.md) pour le lancement.
 
 ## Règles du projet
-- **Ne pas changer le parcours ni les pages du prototype** sans accord de l'équipe : 9 pages, mêmes libellés, même style (`css/style.css`).
+- **Ne pas changer le parcours ni les pages du prototype** sans accord de l'équipe : mêmes libellés, même style (`css/style.css`).
+- **Aucune notion de compte** : pas de connexion, inscription, favoris, alertes ni espace personnel (pas de base de données). Ne pas en réintroduire.
 - **Ne jamais inventer de donnée.** Absent = `null` dans `js/data.js`, « n.d. » à l'écran. Jamais 0.
 - **Définir avant d'afficher.** Le « taux d'accès » est propositions ÷ candidats (phase principale), pas un taux officiel : toujours avec l'infobulle `help(DEF.taux)`.
 - **Candidats comptés par formation** : ne pas les additionner entre formations sans dire « candidatures ».

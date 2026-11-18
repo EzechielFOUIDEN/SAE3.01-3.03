@@ -41,7 +41,7 @@
         <h1>${esc(nom(m))}</h1>
         <div class="chips"><span class="chip">Mention ${esc(mentionLabel(m.mention))}</span><span class="chip">${esc(m.secteur || 'Secteur n.d.')}</span>${m.alternance ? '<span class="chip">Alternance</span>' : ''}<span class="chip">Session ${yr}</span></div>
       </div>
-      <div class="row" style="flex-wrap:nowrap"><button class="btn" data-fav="${esc(m.ifc)}"></button><button class="btn p" data-cmp="${esc(m.ifc)}"></button></div>
+      <div class="row" style="flex-wrap:nowrap"><button class="btn p" data-cmp="${esc(m.ifc)}"></button></div>
     </div>
   </div></div>
 

@@ -72,7 +72,7 @@
         <div class="kpi"><b>${pc(insVal(m, 18, 'insertion'))}</b><span>Insertion à 18 mois (discipline)</span></div>
       </div>
       <a class="btn p" href="fiche.html?id=${esc(m.ifc)}">Voir la formation</a>
-      <div class="row" style="flex-wrap:nowrap"><button class="btn grow" data-fav="${esc(m.ifc)}"></button><button class="btn grow" data-cmp="${esc(m.ifc)}"></button></div>`
+      <div class="row" style="flex-wrap:nowrap"><button class="btn grow" data-cmp="${esc(m.ifc)}"></button></div>`
     : c ? `
       <p class="eyebrow">${c.ms.length} formation${c.ms.length > 1 ? 's' : ''}</p>
       <h2 style="margin:0">${esc(c.ville)}</h2>

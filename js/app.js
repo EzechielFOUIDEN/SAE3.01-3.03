@@ -61,8 +61,7 @@ const insVal = (m, mois, key) => insPoint(m, mois, key)?.[key] ?? null;
 const hayCache = new Map();
 const hay = (m) => hayCache.get(m) ?? (hayCache.set(m, norm([m.mention, mentionLabel(m.mention), m.parcours, m.etab, m.ville, m.region, m.secteur].join(' '))), hayCache.get(m));
 /** Mots-clés : tous présents. Zone : ville, région ou académie. Par défaut, le cœur du périmètre en 2025. */
-function filterMasters({ q = '', zone = '', mention = '', alt = false, tauxMin = 0, large = false, fav = false } = {}) {
-  const fv = fav ? new Set(favs()) : null;
+function filterMasters({ q = '', zone = '', mention = '', alt = false, tauxMin = 0, large = false } = {}) {
   return MASTERS.filter((m) => {
     if (!m.sessions[LAST]) return false; // formation absente de la session 2025
     if (!large && m.niveau !== 'coeur' && !mention) return false;
@@ -70,8 +69,7 @@ function filterMasters({ q = '', zone = '', mention = '', alt = false, tauxMin =
       && (!zone || norm(`${m.ville} ${m.region} ${m.academie}`).includes(norm(zone)))
       && (!mention || m.mention === mention)
       && (!alt || m.alternance)
-      && (tauxMin <= 0 || (taux(m) != null && taux(m) >= tauxMin))
-      && (!fv || fv.has(m.ifc));
+      && (tauxMin <= 0 || (taux(m) != null && taux(m) >= tauxMin));
   });
 }
 
@@ -80,12 +78,10 @@ const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem('ml_' + k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('ml_' + k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
 };
-const user = () => (store.get('logged', false) ? store.get('user', null) : null);
 
 /* ---------- En-tête, pied de page, menu burger ---------- */
 const page = document.body.dataset.page;
 const link = (href, label, key) => `<a href="${href}"${key === page ? ' class="on" aria-current="page"' : ''}>${label}</a>`;
-const u = user();
 document.body.insertAdjacentHTML('afterbegin', `
 <a class="skip" href="#main">Aller au contenu</a>
 <header class="hd">
@@ -98,10 +94,6 @@ document.body.insertAdjacentHTML('afterbegin', `
     ${link('comparateur.html', 'Comparateur', 'comparateur')}
     ${link('quiz.html', 'Quiz', 'quiz')}
   </nav>
-  <div class="row acct" style="flex-wrap:nowrap">
-    ${u ? `<a class="me${page === 'espace' ? ' on' : ''}" href="espace.html">Mon espace</a><button class="btn" data-logout>Déconnexion</button>`
-    : '<a class="btn" href="connexion.html">Connexion</a><a class="btn p" href="inscription.html">Inscription</a>'}
-  </div>
 </header>`);
 document.body.insertAdjacentHTML('beforeend', `
 <footer class="ft">
@@ -119,32 +111,23 @@ function toast(msg) {
   setTimeout(() => $('.toast')?.remove(), 2600);
 }
 
-/* ---------- Favoris (compte requis) et comparateur (3 formations au plus) ---------- */
-const favs = () => store.get('fav', []);
+/* ---------- Comparateur (3 formations au plus, mémorisé dans ce navigateur) ---------- */
 const cmps = () => store.get('cmp', []);
 function syncButtons() {
-  $$('[data-fav]').forEach((b) => { const on = favs().includes(b.dataset.fav); b.setAttribute('aria-pressed', on); b.textContent = on ? '♥ En favori' : '♡ Favori'; });
   $$('[data-cmp]').forEach((b) => { const on = cmps().includes(b.dataset.cmp); b.setAttribute('aria-pressed', on); b.textContent = on ? '✓ Comparé' : 'Comparer'; });
 }
 document.addEventListener('click', (e) => {
-  const fav = e.target.closest('[data-fav]'), cmp = e.target.closest('[data-cmp]');
-  if (e.target.closest('[data-logout]')) { store.set('logged', false); location.href = 'index.html'; }
-  if (fav) {
-    if (!user()) { location.href = 'connexion.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search + location.hash); return; }
-    const id = fav.dataset.fav, list = favs();
-    store.set('fav', list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-    toast(list.includes(id) ? 'Retiré des favoris' : 'Ajouté à tes favoris (Mon espace)');
-  }
+  const cmp = e.target.closest('[data-cmp]');
   if (cmp) {
     const id = cmp.dataset.cmp, list = cmps();
     if (list.includes(id)) { store.set('cmp', list.filter((x) => x !== id)); toast('Retiré du comparateur'); }
     else if (list.length >= 3) toast('3 formations au plus dans le comparateur');
     else { store.set('cmp', [...list, id]); toast(`Ajouté au comparateur (${list.length + 1}/3)`); }
   }
-  if (fav || cmp) { syncButtons(); document.dispatchEvent(new Event('ml:change')); }
+  if (cmp) { syncButtons(); document.dispatchEvent(new Event('ml:change')); }
 });
 
-/* ---------- Carte de formation (liste, favoris, quiz) ---------- */
+/* ---------- Carte de formation (liste, quiz) ---------- */
 const chips = (m) => `<div class="chips"><span class="chip">${fmt(S(m).places)} places</span><span class="chip">Taux d’accès ${pc(taux(m))}</span>${m.alternance ? '<span class="chip">Alternance</span>' : ''}</div>`;
 const card = (m, extra = '') => `
 <article class="fc">
@@ -155,7 +138,7 @@ const card = (m, extra = '') => `
   </div>
   <div class="acts">
     <a class="btn p" href="fiche.html?id=${esc(m.ifc)}">Voir la formation</a>
-    <div class="row" style="flex-wrap:nowrap"><button class="btn grow" data-fav="${esc(m.ifc)}"></button><button class="btn grow" data-cmp="${esc(m.ifc)}"></button></div>
+    <div class="row" style="flex-wrap:nowrap"><button class="btn grow" data-cmp="${esc(m.ifc)}"></button></div>
   </div>
 </article>`;
 

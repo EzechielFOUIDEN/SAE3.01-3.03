@@ -20,7 +20,6 @@ puis <http://localhost:5500>. Aucune installation n'est nécessaire (ECharts est
 | `fiche.html?id=…` | admission, 3 sessions, origine des admis, position nationale, insertion de la discipline |
 | `comparateur.html` | jusqu'à 3 formations côte à côte |
 | `quiz.html` | 5 questions, résultat en « X critères sur Y » |
-| `connexion.html`, `inscription.html`, `espace.html` | compte (local au navigateur) et favoris |
 
 ## Données
 Générées par `scripts/build-data.mjs` à partir des CSV officiels et de deux API publiques :
