@@ -1,0 +1,36 @@
+/* Design tokens Master Lab — charte : anthracite #545454, bleu marin #0055cb, jaune safran #f4c430 */
+:root {
+  --bleu: #0055cb;
+  --bleu-fonce: #00296b;
+  --bleu-clair: #dbe8fb;
+  --jaune: #f4c430;
+  --jaune-clair: #fdf1c4;
+  --anthracite: #545454;
+  --encre: #15181f;
+  --perle: #eef0f3;
+  --papier: #fafaf8;
+  --blanc: #ffffff;
+  --trait: #d9dce2;
+  --alerte: #b3261e;
+  --alerte-fond: #fbe9e7;
+  --ok: #1d7a46;
+
+  /* séries de graphiques : bleu (principal), jaune (accent), gris, bleu ciel, bleu nuit */
+  --s1: #0055cb; --s2: #f4c430; --s3: #7a8394; --s4: #6fa3ee; --s5: #00296b;
+
+  --font-titre: 'League Spartan', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+  --font-texte: 'Open Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --t-xs: .78rem; --t-s: .875rem; --t-m: 1rem; --t-l: 1.2rem;
+  --t-xl: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+  --t-2xl: clamp(2rem, 1.4rem + 2.6vw, 3.4rem);
+  --t-hero: clamp(2.6rem, 1.4rem + 5vw, 5.6rem);
+
+  --r: 4px;
+  --gap: 24px;
+  --gutter: clamp(16px, 4vw, 48px);
+  --max: 1240px;
+  --header-h: 64px;
+  --ombre: 0 1px 0 rgba(21, 24, 31, .06), 0 8px 24px -12px rgba(21, 24, 31, .18);
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
